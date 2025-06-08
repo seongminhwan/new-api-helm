@@ -1,0 +1,411 @@
+# Default values for new-api.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# New-API application settings
+newapi:
+  # Image settings
+  image:
+    registry: docker.io
+    repository: calciumion/new-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  # Deployment strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  
+  # Master node configuration
+  master:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    # Node affinity and tolerations
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    
+    # Persistent storage for master node
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessMode: ReadWriteOnce
+      size: 10Gi
+      annotations: {}
+    
+    # Log persistence
+    logPersistence:
+      enabled: true
+      storageClass: ""
+      accessMode: ReadWriteOnce
+      size: 5Gi
+      annotations: {}
+  
+  # Slave nodes configuration
+  slave:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    # Node affinity and tolerations
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    
+    # Auto scaling
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+  
+  # Load balancer settings (when type is LoadBalancer)
+  loadBalancer:
+    enabled: false
+    annotations: {}
+    # Example for AWS NLB
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: new-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: new-api-tls
+  #    hosts:
+  #      - new-api.local
+
+# MySQL configuration
+mysql:
+  # Enable MySQL deployment
+  enabled: true
+  
+  # High availability settings
+  ha:
+    enabled: false
+    replicaCount: 3
+  
+  # Single node settings (when ha.enabled is false)
+  single:
+    replicaCount: 1
+  
+  # Image settings
+  image:
+    registry: docker.io
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+  
+  # Database configuration
+  auth:
+    rootPassword: ""  # Will be auto-generated if empty
+    database: "new-api"
+    username: "newapi"
+    password: ""  # Will be auto-generated if empty
+  
+  # Resources
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  
+  # Persistence
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    annotations: {}
+  
+  # Service
+  service:
+    type: ClusterIP
+    port: 3306
+  
+  # External MySQL (when mysql.enabled is false)
+  external:
+    host: ""
+    port: 3306
+    database: "new-api"
+    username: "root"
+    password: ""
+    existingSecret: ""
+    existingSecretPasswordKey: "password"
+
+# Redis configuration
+redis:
+  # Enable Redis deployment
+  enabled: true
+  
+  # High availability cluster settings
+  cluster:
+    enabled: false
+    replicaCount: 6  # 3 masters + 3 slaves
+  
+  # Single node settings (when cluster.enabled is false)
+  single:
+    replicaCount: 1
+  
+  # Image settings
+  image:
+    registry: docker.io
+    repository: redis
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+  
+  # Authentication
+  auth:
+    enabled: true
+    password: ""  # Will be auto-generated if empty
+  
+  # Resources
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Persistence
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    annotations: {}
+  
+  # Service
+  service:
+    type: ClusterIP
+    port: 6379
+  
+  # External Redis (when redis.enabled is false)
+  external:
+    host: ""
+    port: 6379
+    password: ""
+    database: 0
+    existingSecret: ""
+    existingSecretPasswordKey: "password"
+
+# Application configuration
+config:
+  # Timezone
+  timezone: "Asia/Shanghai"
+  
+  # Frontend base URL
+  frontendBaseUrl: "https://new-api.local"
+  
+  # Sync settings
+  syncFrequency: 60
+  
+  # Batch update settings
+  batchUpdate:
+    enabled: true
+    interval: 5
+  
+  # Memory cache
+  memoryCache:
+    enabled: true
+  
+  # Session settings
+  session:
+    secret: ""  # Will be auto-generated if empty
+    maxAge: 86400
+  
+  # Crypto settings
+  crypto:
+    secret: ""  # Will be auto-generated if empty
+  
+  # Log settings
+  log:
+    level: "info"
+    sqlLog: false
+  
+  # Rate limiting
+  rateLimit:
+    enabled: true
+    requestsPerMinute: 60
+  
+  # Additional environment variables
+  extraEnvVars: []
+  # - name: CUSTOM_VAR
+  #   value: "custom_value"
+  
+  # Environment variables from secrets/configmaps
+  extraEnvVarsSecret: ""
+  extraEnvVarsConfigMap: ""
+
+# Security settings
+security:
+  # Pod Security Context
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  # Container Security Context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /api/status
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /api/status
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Monitoring
+monitoring:
+  # ServiceMonitor for Prometheus
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    labels: {}
+    annotations: {}
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+  
+  # Grafana dashboard
+  grafanaDashboard:
+    enabled: false
+    namespace: ""
+    labels: {}
+
+# Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 7  # Keep 7 days of backups
+  
+  # Storage for backups
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 50Gi
+  
+  # Resources for backup job
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Network policies
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# RBAC
+rbac:
+  create: true
+  
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+sidecars: []
+
+# Extra volumes
+extraVolumes: []
+
+# Extra volume mounts
+extraVolumeMounts: []
+
+# Node selector for all pods
+nodeSelector: {}
+
+# Tolerations for all pods
+tolerations: []
+
+# Affinity for all pods
+affinity: {}
+
+# Priority class
+priorityClassName: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}

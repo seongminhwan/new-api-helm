@@ -1,0 +1,232 @@
+# New API 高可用安装示例
+# 适用于生产环境的高可用配置
+
+# 高可用配置
+newapi:
+  image:
+    tag: "latest"
+  
+  master:
+    enabled: true
+    replicaCount: 2  # 多个 master 实例
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "fast-ssd"  # 使用高性能存储
+  
+  slave:
+    enabled: true
+    replicaCount: 3  # 启用 slave 节点
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+# 数据库配置 (生产级 MySQL)
+mysql:
+  enabled: true
+  auth:
+    database: "newapi"
+    username: "newapi"
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: "fast-ssd"
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  # MySQL 配置优化
+  configuration: |
+    [mysqld]
+    innodb_buffer_pool_size = 2G
+    innodb_log_file_size = 256M
+    max_connections = 1000
+    query_cache_size = 128M
+
+# Redis 配置 (生产级 Redis)
+redis:
+  enabled: true
+  auth:
+    enabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: "fast-ssd"
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# 负载均衡服务
+service:
+  type: LoadBalancer
+  port: 80
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # AWS NLB
+    # service.beta.kubernetes.io/azure-load-balancer-internal: "true"  # Azure 内部 LB
+    # cloud.google.com/load-balancer-type: "Internal"  # GCP 内部 LB
+
+# Ingress 配置 (生产环境)
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: new-api-tls
+      hosts:
+        - api.yourdomain.com
+
+# 配置
+config:
+  timezone: "Asia/Shanghai"
+  # 生产环境建议手动设置密钥
+  session:
+    secret: "your-production-session-secret-32-chars"
+  crypto:
+    secret: "your-production-crypto-secret-32-chars"
+
+# 健康检查 (增强配置)
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod 中断预算
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# 监控配置
+monitoring:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
+    labels:
+      release: prometheus
+
+# 网络策略 (安全配置)
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 3000
+
+# 备份配置
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # 每天凌晨2点备份
+  retention: 30  # 保留30天
+  storage:
+    size: 100Gi
+    storageClass: "standard"
+
+# 安全配置
+security:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL
+
+# 资源配额和限制
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+# 节点亲和性 (可选)
+nodeSelector:
+  kubernetes.io/arch: amd64
+  node-type: compute
+
+# Pod 反亲和性 (确保 Pod 分布在不同节点)
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - new-api
+          topologyKey: kubernetes.io/hostname
+
+# 容忍度 (可选)
+tolerations:
+  - key: "dedicated"
+    operator: "Equal"
+    value: "new-api"
+    effect: "NoSchedule"

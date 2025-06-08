@@ -1,0 +1,47 @@
+{{- if and .Values.newapi.master.enabled .Values.newapi.master.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "new-api.fullname" . }}-master-data
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+  {{- with .Values.newapi.master.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.newapi.master.persistence.accessMode | quote }}
+  {{- $storageClass := include "new-api.storageClass" (dict "storageClass" .Values.newapi.master.persistence.storageClass "global" .Values.global) }}
+  {{- if $storageClass }}
+  storageClassName: {{ $storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.newapi.master.persistence.size | quote }}
+---
+{{- end }}
+{{- if and .Values.newapi.master.enabled .Values.newapi.master.logPersistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "new-api.fullname" . }}-master-logs
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+  {{- with .Values.newapi.master.logPersistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.newapi.master.logPersistence.accessMode | quote }}
+  {{- $storageClass := include "new-api.storageClass" (dict "storageClass" .Values.newapi.master.logPersistence.storageClass "global" .Values.global) }}
+  {{- if $storageClass }}
+  storageClassName: {{ $storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.newapi.master.logPersistence.size | quote }}
+{{- end }}

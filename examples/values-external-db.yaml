@@ -1,0 +1,187 @@
+# External Database values for new-api
+# This configuration uses external MySQL and Redis services
+
+# New-API application settings
+newapi:
+  image:
+    tag: "v0.6.6"
+  
+  # Master node configuration
+  master:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    persistence:
+      enabled: true
+      size: 10Gi
+    
+    logPersistence:
+      enabled: true
+      size: 5Gi
+  
+  # Slave nodes configuration
+  slave:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: new-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: new-api-tls
+      hosts:
+        - new-api.example.com
+
+# MySQL configuration - External
+mysql:
+  enabled: false  # Disable internal MySQL
+  external:
+    host: "mysql.rds.amazonaws.com"  # Replace with your MySQL host
+    port: 3306
+    database: "new_api"
+    username: "newapi_user"
+    password: "your_secure_password"  # Consider using existingSecret instead
+    # existingSecret: "mysql-credentials"
+    # existingSecretPasswordKey: "password"
+
+# Redis configuration - External
+redis:
+  enabled: false  # Disable internal Redis
+  external:
+    host: "redis.elasticache.amazonaws.com"  # Replace with your Redis host
+    port: 6379
+    password: "your_redis_password"  # Consider using existingSecret instead
+    database: 0
+    # existingSecret: "redis-credentials"
+    # existingSecretPasswordKey: "password"
+
+# Application configuration
+config:
+  timezone: "Asia/Shanghai"
+  frontendBaseUrl: "https://new-api.example.com"
+  syncFrequency: 60
+  
+  batchUpdate:
+    enabled: true
+    interval: 5
+  
+  memoryCache:
+    enabled: true
+  
+  log:
+    level: "info"
+    sqlLog: false
+  
+  rateLimit:
+    enabled: true
+    requestsPerMinute: 60
+
+# Security settings
+security:
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# Health checks
+healthCheck:
+  enabled: true
+
+# Monitoring
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# Backup configuration - External database backup
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 7  # Keep 7 days
+  
+  persistence:
+    enabled: true
+    size: 50Gi
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Network policies
+networkPolicy:
+  enabled: true
+  egress:
+    # Allow egress to external MySQL
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 3306
+    # Allow egress to external Redis
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow HTTPS egress
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow HTTP egress
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# RBAC
+rbac:
+  create: true
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations:
+    # Add IAM role annotations if using AWS
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/new-api-role

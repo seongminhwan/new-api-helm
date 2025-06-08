@@ -1,0 +1,26 @@
+{{- if .Values.redis.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "new-api.fullname" . }}-redis
+  labels:
+    {{- include "new-api.redis.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.redis.service.type }}
+  ports:
+    - port: {{ .Values.redis.service.port }}
+      targetPort: redis
+      protocol: TCP
+      name: redis
+    {{- if .Values.redis.cluster.enabled }}
+    - port: 16379
+      targetPort: cluster
+      protocol: TCP
+      name: cluster
+    {{- end }}
+  selector:
+    {{- include "new-api.redis.selectorLabels" . | nindent 4 }}
+  {{- if not .Values.redis.cluster.enabled }}
+  clusterIP: None
+  {{- end }}
+{{- end }}

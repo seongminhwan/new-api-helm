@@ -1,0 +1,133 @@
+{{- if .Values.newapi.master.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "new-api.fullname" . }}-master
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+spec:
+  replicas: {{ .Values.newapi.master.replicaCount }}
+  strategy:
+    {{- toYaml .Values.newapi.strategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "new-api.masterSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "new-api.masterSelectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "new-api.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.security.podSecurityContext | nindent 8 }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: new-api-master
+          securityContext:
+            {{- toYaml .Values.security.securityContext | nindent 12 }}
+          image: {{ include "new-api.image" . }}
+          imagePullPolicy: {{ .Values.newapi.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: SQL_DSN
+              value: {{ include "new-api.mysql.connectionString" . | quote }}
+            - name: REDIS_CONN_STRING
+              value: {{ include "new-api.redis.connectionString" . | quote }}
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: session-secret
+            - name: CRYPTO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: crypto-secret
+            - name: NODE_TYPE
+              value: "master"
+          envFrom:
+            - configMapRef:
+                name: {{ include "new-api.fullname" . }}-config
+            {{- if .Values.config.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ .Values.config.extraEnvVarsSecret }}
+            {{- end }}
+            {{- if .Values.config.extraEnvVarsConfigMap }}
+            - configMapRef:
+                name: {{ .Values.config.extraEnvVarsConfigMap }}
+            {{- end }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.newapi.master.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: logs
+              mountPath: /app/logs
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- with .Values.sidecars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+        {{- if .Values.newapi.master.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "new-api.fullname" . }}-master-data
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.newapi.master.logPersistence.enabled }}
+        - name: logs
+          persistentVolumeClaim:
+            claimName: {{ include "new-api.fullname" . }}-master-logs
+        {{- else }}
+        - name: logs
+          emptyDir: {}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.newapi.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.newapi.master.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.newapi.master.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+{{- end }}

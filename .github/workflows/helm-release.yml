@@ -1,0 +1,107 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Chart.yaml'
+      - 'values.yaml'
+      - 'templates/**'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Lint Helm Chart
+        run: |
+          helm lint .
+
+      - name: Package Helm Chart
+        run: |
+          mkdir -p docs
+          helm package . -d docs/
+
+      - name: Generate Helm Repository Index
+        run: |
+          helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true
+
+      - name: Update README with correct URLs
+        run: |
+          sed -i "s|https://yourusername.github.io/new-api-helm/|https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/|g" README.md
+          sed -i "s|yourusername/new-api-helm|${{ github.repository }}|g" README.md
+
+      - name: Commit updated README
+        run: |
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update README with correct repository URLs [skip ci]"
+            git push
+          fi
+
+      - name: Create Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            ## Helm Chart Release v${{ github.run_number }}
+            
+            ### 安装方式
+            ```bash
+            helm repo add new-api https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+            helm repo update
+            helm install my-new-api new-api/new-api
+            ```
+            
+            ### 变更内容
+            - 自动发布的 Helm Chart 版本
+            - 更新了仓库索引文件
+            
+            ### 文件
+            - Helm Chart 包已发布到 GitHub Pages
+            - 可通过上述命令安装使用
+          files: |
+            docs/*.tgz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Success
+        run: |
+          echo "✅ Helm Chart 发布成功!"
+          echo "📦 仓库地址: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          echo "🚀 安装命令: helm repo add new-api https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"

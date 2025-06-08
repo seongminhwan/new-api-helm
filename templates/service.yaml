@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "new-api.fullname" . }}
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "new-api.selectorLabels" . | nindent 4 }}
+  {{- if .Values.service.loadBalancer.enabled }}
+  {{- with .Values.service.loadBalancer.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+---
+{{- if .Values.newapi.master.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "new-api.fullname" . }}-master
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "new-api.masterSelectorLabels" . | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.newapi.slave.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "new-api.fullname" . }}-slave
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: slave
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "new-api.slaveSelectorLabels" . | nindent 4 }}
+{{- end }}

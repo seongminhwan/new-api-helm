@@ -1,0 +1,106 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "new-api.fullname" . }}-backup
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "new-api.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "new-api.serviceAccountName" . }}
+          containers:
+            - name: mysql-backup
+              image: {{ include "new-api.mysql.image" . }}
+              imagePullPolicy: {{ .Values.mysql.image.pullPolicy }}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  BACKUP_FILE="/backup/new-api-$(date +%Y%m%d-%H%M%S).sql"
+                  echo "Starting backup to $BACKUP_FILE"
+                  
+                  {{- if .Values.mysql.enabled }}
+                  mysqldump -h {{ include "new-api.fullname" . }}-mysql \
+                    -u {{ .Values.mysql.auth.username }} \
+                    -p$MYSQL_PASSWORD \
+                    {{ .Values.mysql.auth.database }} > $BACKUP_FILE
+                  {{- else }}
+                  mysqldump -h {{ .Values.mysql.external.host }} \
+                    -P {{ .Values.mysql.external.port }} \
+                    -u {{ .Values.mysql.external.username }} \
+                    -p$MYSQL_PASSWORD \
+                    {{ .Values.mysql.external.database }} > $BACKUP_FILE
+                  {{- end }}
+                  
+                  echo "Backup completed: $BACKUP_FILE"
+                  echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+                  
+                  # Clean up old backups
+                  echo "Cleaning up backups older than {{ .Values.backup.retention }} days"
+                  find /backup -name "new-api-*.sql" -type f -mtime +{{ .Values.backup.retention }} -delete
+                  
+                  echo "Remaining backups:"
+                  ls -la /backup/new-api-*.sql || echo "No backups found"
+              env:
+                - name: MYSQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "new-api.fullname" . }}-secrets
+                      {{- if .Values.mysql.enabled }}
+                      key: mysql-password
+                      {{- else }}
+                      key: mysql-password
+                      {{- end }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backup
+          volumes:
+            {{- if .Values.backup.persistence.enabled }}
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: {{ include "new-api.fullname" . }}-backup
+            {{- else }}
+            - name: backup-storage
+              emptyDir: {}
+            {{- end }}
+---
+{{- if .Values.backup.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "new-api.fullname" . }}-backup
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - {{ .Values.backup.persistence.accessMode | quote }}
+  {{- $storageClass := include "new-api.storageClass" (dict "storageClass" .Values.backup.persistence.storageClass "global" .Values.global) }}
+  {{- if $storageClass }}
+  storageClassName: {{ $storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.persistence.size | quote }}
+{{- end }}
+{{- end }}

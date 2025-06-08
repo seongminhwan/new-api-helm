@@ -1,0 +1,33 @@
+{{- if .Values.newapi.slave.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "new-api.fullname" . }}-slave
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: slave
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "new-api.fullname" . }}-slave
+  minReplicas: {{ .Values.newapi.slave.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.newapi.slave.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.newapi.slave.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.newapi.slave.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.newapi.slave.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.newapi.slave.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

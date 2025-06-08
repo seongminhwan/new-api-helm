@@ -1,0 +1,146 @@
+{{- if .Values.mysql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "new-api.fullname" . }}-mysql
+  labels:
+    {{- include "new-api.mysql.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "new-api.fullname" . }}-mysql
+  {{- if .Values.mysql.ha.enabled }}
+  replicas: {{ .Values.mysql.ha.replicaCount }}
+  {{- else }}
+  replicas: {{ .Values.mysql.single.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "new-api.mysql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "new-api.mysql.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "new-api.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.security.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mysql
+          securityContext:
+            {{- toYaml .Values.security.securityContext | nindent 12 }}
+          image: {{ include "new-api.mysql.image" . }}
+          imagePullPolicy: {{ .Values.mysql.image.pullPolicy }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: mysql-root-password
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.auth.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.auth.username | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: mysql-password
+            {{- if .Values.mysql.ha.enabled }}
+            - name: MYSQL_REPLICATION_MODE
+              value: "master"
+            - name: MYSQL_REPLICATION_USER
+              value: "replicator"
+            - name: MYSQL_REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: mysql-password
+            {{- end }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - mysql -h localhost -u root -p$MYSQL_ROOT_PASSWORD -e "SELECT 1"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.mysql.resources | nindent 12 }}
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            {{- if .Values.mysql.ha.enabled }}
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d
+            {{- end }}
+      {{- if .Values.mysql.ha.enabled }}
+      volumes:
+        - name: mysql-config
+          configMap:
+            name: {{ include "new-api.fullname" . }}-mysql-config
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.mysql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+        {{- with .Values.mysql.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.mysql.persistence.accessMode | quote }}
+        {{- $storageClass := include "new-api.storageClass" (dict "storageClass" .Values.mysql.persistence.storageClass "global" .Values.global) }}
+        {{- if $storageClass }}
+        storageClassName: {{ $storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mysql.persistence.size | quote }}
+  {{- else }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  {{- end }}
+{{- end }}

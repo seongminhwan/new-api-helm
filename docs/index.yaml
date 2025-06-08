@@ -1,0 +1,26 @@
+apiVersion: v1
+entries:
+  new-api:
+  - apiVersion: v2
+    appVersion: latest
+    created: "2025-06-08T17:45:44.066357+08:00"
+    description: A Helm chart for deploying New-API service with high availability
+      support
+    digest: 2933ae734b22c3361cdb3f52717dc820800f36e2f21bed2c6c044b247e92cf75
+    home: https://github.com/Calcium-Ion/new-api
+    keywords:
+    - new-api
+    - openai
+    - api-gateway
+    - high-availability
+    maintainers:
+    - email: support@newapi.pro
+      name: New-API Team
+    name: new-api
+    sources:
+    - https://github.com/Calcium-Ion/new-api
+    type: application
+    urls:
+    - https://seongminhwan.github.io/new-api-helm/new-api-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-06-08T17:45:44.064705+08:00"

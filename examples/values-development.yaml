@@ -1,0 +1,154 @@
+# Development values for new-api
+# This is a YAML-formatted file for development deployment
+
+# New-API application settings
+newapi:
+  image:
+    tag: "latest"
+    pullPolicy: Always
+  
+  # Master node configuration
+  master:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+    persistence:
+      enabled: false  # Use emptyDir for development
+    
+    logPersistence:
+      enabled: false
+  
+  # Slave nodes configuration
+  slave:
+    enabled: true
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+    autoscaling:
+      enabled: false  # Disable autoscaling in dev
+
+# Service configuration
+service:
+  type: NodePort
+
+# Ingress configuration
+ingress:
+  enabled: false  # Use port-forward or NodePort in dev
+
+# MySQL configuration - Single node
+mysql:
+  enabled: true
+  ha:
+    enabled: false  # Single node for development
+  
+  single:
+    replicaCount: 1
+  
+  auth:
+    database: "new_api_dev"
+    username: "newapi"
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  persistence:
+    enabled: false  # Use emptyDir for development
+
+# Redis configuration - Single node
+redis:
+  enabled: true
+  cluster:
+    enabled: false  # Single node for development
+  
+  single:
+    replicaCount: 1
+  
+  auth:
+    enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  
+  persistence:
+    enabled: false  # Use emptyDir for development
+
+# Application configuration
+config:
+  timezone: "Asia/Shanghai"
+  frontendBaseUrl: "http://localhost:8080"
+  syncFrequency: 60
+  
+  batchUpdate:
+    enabled: true
+    interval: 5
+  
+  memoryCache:
+    enabled: true
+  
+  log:
+    level: "debug"
+    sqlLog: true  # Enable SQL logging in dev
+  
+  rateLimit:
+    enabled: false  # Disable rate limiting in dev
+
+# Security settings - Relaxed for development
+security:
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: false  # Allow root for easier debugging
+    runAsUser: 0
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    initialDelaySeconds: 10  # Faster startup in dev
+    periodSeconds: 10
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Monitoring - Disabled for development
+monitoring:
+  serviceMonitor:
+    enabled: false
+
+# Backup - Disabled for development
+backup:
+  enabled: false
+
+# Network policies - Disabled for development
+networkPolicy:
+  enabled: false
+
+# Pod Disruption Budget - Disabled for development
+podDisruptionBudget:
+  enabled: false
+
+# RBAC - Simplified for development
+rbac:
+  create: true

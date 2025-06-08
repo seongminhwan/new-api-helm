@@ -1,0 +1,198 @@
+# Production values for new-api
+# This is a YAML-formatted file for production deployment
+
+# Global settings
+global:
+  storageClass: "fast-ssd"
+
+# New-API application settings
+newapi:
+  image:
+    tag: "v0.6.6"  # Use specific version in production
+  
+  # Master node configuration
+  master:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "1000m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+    
+    persistence:
+      enabled: true
+      size: 20Gi
+    
+    logPersistence:
+      enabled: true
+      size: 10Gi
+  
+  # Slave nodes configuration
+  slave:
+    enabled: true
+    replicaCount: 5
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "1000m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+    
+    autoscaling:
+      enabled: true
+      minReplicas: 5
+      maxReplicas: 20
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 70
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: new-api-tls
+      hosts:
+        - api.yourdomain.com
+
+# MySQL configuration - High Availability
+mysql:
+  enabled: true
+  ha:
+    enabled: true
+    replicaCount: 3
+  
+  auth:
+    database: "new_api_prod"
+    username: "newapi"
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  
+  persistence:
+    enabled: true
+    size: 100Gi
+
+# Redis configuration - Cluster mode
+redis:
+  enabled: true
+  cluster:
+    enabled: true
+    replicaCount: 6
+  
+  auth:
+    enabled: true
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  persistence:
+    enabled: true
+    size: 20Gi
+
+# Application configuration
+config:
+  timezone: "Asia/Shanghai"
+  frontendBaseUrl: "https://api.yourdomain.com"
+  syncFrequency: 30
+  
+  batchUpdate:
+    enabled: true
+    interval: 3
+  
+  memoryCache:
+    enabled: true
+  
+  log:
+    level: "warn"
+    sqlLog: false
+  
+  rateLimit:
+    enabled: true
+    requestsPerMinute: 120
+
+# Security settings
+security:
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# Health checks
+healthCheck:
+  enabled: true
+
+# Monitoring
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    path: /metrics
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  retention: 30  # Keep 30 days
+  
+  persistence:
+    enabled: true
+    size: 200Gi
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+# Network policies
+networkPolicy:
+  enabled: true
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Node affinity for production
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values:
+          - new-api
+      topologyKey: "kubernetes.io/hostname"
+
+# Priority class for production workloads
+priorityClassName: "high-priority"

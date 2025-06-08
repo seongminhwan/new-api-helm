@@ -1,0 +1,77 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "new-api.fullname" . }}
+  labels:
+    {{- include "new-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "new-api.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress from anywhere on port 3000
+    - ports:
+        - protocol: TCP
+          port: 3000
+    # Allow ingress from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Release.Namespace }}
+    {{- with .Values.networkPolicy.ingress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # Allow DNS resolution
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow egress to MySQL
+    {{- if .Values.mysql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "new-api.mysql.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 3306
+    {{- else }}
+    # Allow egress to external MySQL
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.mysql.external.port }}
+    {{- end }}
+    # Allow egress to Redis
+    {{- if .Values.redis.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "new-api.redis.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 6379
+        {{- if .Values.redis.cluster.enabled }}
+        - protocol: TCP
+          port: 16379
+        {{- end }}
+    {{- else }}
+    # Allow egress to external Redis
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.redis.external.port }}
+    {{- end }}
+    # Allow egress to same namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Release.Namespace }}
+    {{- with .Values.networkPolicy.egress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

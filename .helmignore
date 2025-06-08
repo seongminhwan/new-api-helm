@@ -1,0 +1,68 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.vscode/
+# OS generated files
+Thumbs.db
+# Helm build files
+*.tgz
+# Scripts directory (optional, uncomment if you don't want to include scripts)
+# scripts/
+# Backup directories
+backup-*/
+upgrade-backup-*/
+# Temporary files
+.last-backup-dir
+# Documentation that shouldn't be in the package
+docs/
+# Test files
+tests/
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+# Development files
+Makefile
+# Example files (uncomment if you don't want to include examples)
+# examples/
+# Local development files
+.env
+.env.local
+*.log
+# Node modules if any
+node_modules/
+# Python cache
+__pycache__/
+*.pyc
+# Go build files
+*.exe
+*.dll
+*.so
+*.dylib
+# Java build files
+*.class
+*.jar
+*.war
+# Temporary Kubernetes files
+*.yaml.bak
+*.yml.bak

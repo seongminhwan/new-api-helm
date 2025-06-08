@@ -1,0 +1,96 @@
+# New API 基础安装示例
+# 使用内置 MySQL 和 Redis 的简单配置
+
+# 基本配置
+newapi:
+  image:
+    tag: "latest"
+  
+  master:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  
+  slave:
+    enabled: false
+
+# 数据库配置 (使用内置 MySQL)
+mysql:
+  enabled: true
+  auth:
+    database: "newapi"
+    username: "newapi"
+    # password 将自动生成
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Redis 配置 (使用内置 Redis)
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    # password 将自动生成
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+
+# 服务配置
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress 配置 (可选)
+ingress:
+  enabled: false
+  # 如需启用，请取消注释并修改以下配置
+  # className: "nginx"
+  # hosts:
+  #   - host: api.example.com
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+
+# 配置
+config:
+  timezone: "Asia/Shanghai"
+  # session.secret 和 crypto.secret 将自动生成
+  
+# 健康检查
+healthCheck:
+  enabled: true
+
+# 自动扩缩容 (可选)
+autoscaling:
+  enabled: false
+  # 如需启用，请取消注释并修改以下配置
+  # minReplicas: 1
+  # maxReplicas: 5
+  # targetCPUUtilizationPercentage: 70
+
+# 监控 (可选)
+monitoring:
+  serviceMonitor:
+    enabled: false
+    # 如需启用 Prometheus 监控，请取消注释
+    # namespace: monitoring

@@ -1,0 +1,167 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "new-api.fullname" . }}-redis
+  labels:
+    {{- include "new-api.redis.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "new-api.fullname" . }}-redis
+  {{- if .Values.redis.cluster.enabled }}
+  replicas: {{ .Values.redis.cluster.replicaCount }}
+  {{- else }}
+  replicas: {{ .Values.redis.single.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "new-api.redis.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "new-api.redis.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "new-api.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.security.podSecurityContext | nindent 8 }}
+      containers:
+        - name: redis
+          securityContext:
+            {{- toYaml .Values.security.securityContext | nindent 12 }}
+          image: {{ include "new-api.redis.image" . }}
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          {{- if .Values.redis.cluster.enabled }}
+          command:
+            - redis-server
+          args:
+            - /etc/redis/redis.conf
+            - --cluster-enabled
+            - "yes"
+            - --cluster-config-file
+            - /data/nodes.conf
+            - --cluster-node-timeout
+            - "5000"
+            - --appendonly
+            - "yes"
+            {{- if .Values.redis.auth.enabled }}
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --masterauth
+            - $(REDIS_PASSWORD)
+            {{- end }}
+          {{- else }}
+          command:
+            - redis-server
+          {{- if .Values.redis.auth.enabled }}
+          args:
+            - --requirepass
+            - $(REDIS_PASSWORD)
+          {{- end }}
+          {{- end }}
+          env:
+            {{- if .Values.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "new-api.fullname" . }}-secrets
+                  key: redis-password
+            {{- end }}
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+            {{- if .Values.redis.cluster.enabled }}
+            - name: cluster
+              containerPort: 16379
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                {{- if .Values.redis.auth.enabled }}
+                - -a
+                - $(REDIS_PASSWORD)
+                {{- end }}
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                {{- if .Values.redis.auth.enabled }}
+                - -a
+                - $(REDIS_PASSWORD)
+                {{- end }}
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            {{- if .Values.redis.cluster.enabled }}
+            - name: redis-config
+              mountPath: /etc/redis
+            {{- end }}
+      {{- if .Values.redis.cluster.enabled }}
+      volumes:
+        - name: redis-config
+          configMap:
+            name: {{ include "new-api.fullname" . }}-redis-config
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.redis.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+        {{- with .Values.redis.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.redis.persistence.accessMode | quote }}
+        {{- $storageClass := include "new-api.storageClass" (dict "storageClass" .Values.redis.persistence.storageClass "global" .Values.global) }}
+        {{- if $storageClass }}
+        storageClassName: {{ $storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.persistence.size | quote }}
+  {{- else }}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  {{- end }}
+{{- end }}
