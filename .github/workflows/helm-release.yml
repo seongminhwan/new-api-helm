@@ -1,9 +1,8 @@
-name: Release Helm Chart
+name: Release Helm Chart to GHCR
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'Chart.yaml'
       - 'values.yaml'
@@ -14,94 +13,80 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
+      contents: read
+      packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+    - name: Configure Git
+      run: |
+        git config user.name "seongminhwan"
+        git config user.email "seongminhwan@users.noreply.github.com"
 
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: '3.12.0'
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: '3.12.1'
 
-      - name: Lint Helm Chart
-        run: |
-          helm lint .
+    - name: Lint Helm Chart
+      run: |
+        helm lint .
 
-      - name: Package Helm Chart
-        run: |
-          mkdir -p docs
-          helm package . -d docs/
+    - name: Get Chart Info
+      id: chart
+      run: |
+        CHART_NAME=$(yq '.name' Chart.yaml)
+        CHART_VERSION=$(yq '.version' Chart.yaml)
+        echo "name=$CHART_NAME" >> $GITHUB_OUTPUT
+        echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate Helm Repository Index
-        run: |
-          helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          publish_branch: gh-pages
-          force_orphan: true
+    - name: Push Helm Chart to GHCR
+      run: |
+        echo "Publishing Helm chart ${{ steps.chart.outputs.name }}:${{ steps.chart.outputs.version }} to GHCR"
+        # 以OCI格式打包并推送
+        helm package .
+        helm push ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/helm-charts
 
-      - name: Update README with correct URLs
-        run: |
-          sed -i "s|https://yourusername.github.io/new-api-helm/|https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/|g" README.md
-          sed -i "s|yourusername/new-api-helm|${{ github.repository }}|g" README.md
-
-      - name: Commit updated README
-        run: |
-          git add README.md
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update README with correct repository URLs [skip ci]"
-            git push
-          fi
-
-      - name: Create Release
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
-          body: |
-            ## Helm Chart Release v${{ github.run_number }}
-            
-            ### 安装方式
-            ```bash
-            helm repo add new-api https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-            helm repo update
-            helm install my-new-api new-api/new-api
-            ```
-            
-            ### 变更内容
-            - 自动发布的 Helm Chart 版本
-            - 更新了仓库索引文件
-            
-            ### 文件
-            - Helm Chart 包已发布到 GitHub Pages
-            - 可通过上述命令安装使用
-          files: |
-            docs/*.tgz
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Notify Success
-        run: |
-          echo "✅ Helm Chart 发布成功!"
-          echo "📦 仓库地址: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-          echo "🚀 安装命令: helm repo add new-api https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+    - name: Output Repository Info
+      run: |
+        echo "Chart has been published to GHCR"
+        echo "Usage information:"
+        echo "1. Set up authentication to GHCR (https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)"
+        echo "2. Install or pull the chart:"
+        echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
+        echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
+        
+    - name: Squash Commits
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # 配置推送权限
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        
+        # 获取当前分支最新状态
+        git fetch origin
+        git checkout main
+        
+        # 创建临时分支
+        git checkout -b temp-branch
+        
+        # 获取第一个提交的hash
+        FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+        
+        # 软重置到第一个提交
+        git reset --soft $FIRST_COMMIT
+        
+        # 提交所有更改为一个提交
+        git commit -m "所有更新合并为一个提交 [由 seongminhwan 执行]" --author="seongminhwan <seongminhwan@users.noreply.github.com>"
+        
+        # 强制推送到main分支
+        git push origin temp-branch:main --force

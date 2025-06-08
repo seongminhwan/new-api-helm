@@ -38,20 +38,28 @@ spec:
           image: {{ include "new-api.mysql.image" . }}
           imagePullPolicy: {{ .Values.mysql.image.pullPolicy }}
           env:
+            # Bitnami MySQL environment variables (correct naming for Bitnami)
             - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "new-api.fullname" . }}-secrets
-                  key: mysql-root-password
+              value: {{ .Values.mysql.auth.rootPassword | quote }}
             - name: MYSQL_DATABASE
               value: {{ .Values.mysql.auth.database | quote }}
             - name: MYSQL_USER
               value: {{ .Values.mysql.auth.username | quote }}
             - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "new-api.fullname" . }}-secrets
-                  key: mysql-password
+              value: {{ .Values.mysql.auth.password | quote }}
+            # Bitnami specific settings
+            - name: MYSQL_AUTHENTICATION_PLUGIN
+              value: "mysql_native_password"
+            - name: MYSQL_CHARACTER_SET
+              value: "utf8mb4"
+            - name: MYSQL_COLLATE
+              value: "utf8mb4_unicode_ci"
+            # Enable remote access - Bitnami specific
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "no"
+            # Bitnami MySQL specific - allow root access from any host
+            - name: MYSQL_ROOT_HOST
+              value: "%"
             {{- if .Values.mysql.ha.enabled }}
             - name: MYSQL_REPLICATION_MODE
               value: "master"
@@ -72,7 +80,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD
+                - mysqladmin ping -h localhost -u {{ .Values.mysql.auth.username }} -p$MYSQL_PASSWORD
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -82,7 +90,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - mysql -h localhost -u root -p$MYSQL_ROOT_PASSWORD -e "SELECT 1"
+                - mysql -h localhost -u {{ .Values.mysql.auth.username }} -p$MYSQL_PASSWORD -e "SELECT 1"
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 1
@@ -91,17 +99,26 @@ spec:
             {{- toYaml .Values.mysql.resources | nindent 12 }}
           volumeMounts:
             - name: mysql-data
-              mountPath: /var/lib/mysql
+              mountPath: /bitnami/mysql/data
+            {{- if .Values.mysql.initdbScripts }}
+            - name: mysql-init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+            {{- end }}
             {{- if .Values.mysql.ha.enabled }}
             - name: mysql-config
-              mountPath: /etc/mysql/conf.d
+              mountPath: /opt/bitnami/mysql/conf
             {{- end }}
-      {{- if .Values.mysql.ha.enabled }}
       volumes:
+        {{- if .Values.mysql.initdbScripts }}
+        - name: mysql-init-scripts
+          configMap:
+            name: {{ include "new-api.fullname" . }}-mysql-init
+        {{- end }}
+        {{- if .Values.mysql.ha.enabled }}
         - name: mysql-config
           configMap:
             name: {{ include "new-api.fullname" . }}-mysql-config
-      {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

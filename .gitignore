@@ -191,3 +191,21 @@ requirements.lock
 # Kubernetes
 *.kubeconfig
 kubeconfig
+# 敏感数据保护
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets/
+.env
+.env.local
+.env.production
+config/secrets.yaml
+values-secrets.yaml
+
+# 个人配置文件
+.personal/
+personal-values.yaml
+my-values.yaml

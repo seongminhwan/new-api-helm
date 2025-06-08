@@ -9,6 +9,8 @@
 ## 📋 功能特性
 
 - ✅ **高可用架构**: 支持 Master/Slave 模式部署
+- ✅ **智能负载均衡**: 自动选择器和智能流量分发
+- ✅ **自动外部访问**: 未启用 Ingress 时自动启用 NodePort
 - ✅ **内置数据库**: 集成 MySQL StatefulSet
 - ✅ **缓存支持**: 集成 Redis 缓存
 - ✅ **自动扩缩容**: 支持 HPA (Horizontal Pod Autoscaler)
@@ -27,7 +29,27 @@
 - 至少 2GB 可用内存
 - 至少 10GB 可用存储空间
 
-### 添加 Helm 仓库
+### 使用 OCI 仓库安装 (推荐)
+
+我们使用 OCI (Open Container Initiative) 格式通过 GitHub Container Registry 分发 Helm Chart，这种方式比传统的 Helm 仓库更高效，不需要下载整个仓库索引。
+
+```bash
+# 配置认证 (参考 GitHub 文档进行安全配置)
+# https://docs.github.com/cn/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
+
+# 直接安装最新版本
+helm install my-new-api oci://ghcr.io/seongminhwan/helm-charts/new-api
+
+# 安装特定版本
+helm install my-new-api oci://ghcr.io/seongminhwan/helm-charts/new-api --version 1.0.0
+
+# 使用自定义配置
+helm install my-new-api oci://ghcr.io/seongminhwan/helm-charts/new-api -f custom-values.yaml
+```
+
+### 传统方式安装 (不推荐)
+
+如果您使用的 Helm 版本低于 3.8.0，可以使用传统方式，但此方式将被逐步淘汰：
 
 ```bash
 # 添加仓库 (请替换为实际的GitHub Pages地址)
@@ -35,12 +57,8 @@ helm repo add new-api https://seongminhwan.github.io/new-api-helm/
 
 # 更新仓库索引
 helm repo update
-```
 
-### 安装 New API
-
-```bash
-# 使用默认配置安装
+# 安装
 helm install my-new-api new-api/new-api
 
 # 或者使用自定义配置
@@ -55,7 +73,13 @@ kubectl get svc my-new-api
 
 # 如果启用了 Ingress
 kubectl get ingress my-new-api
+
+# 如果未启用 Ingress，服务会自动使用 NodePort (默认端口 30080)
+kubectl get nodes -o wide
+# 然后访问 http://<node-ip>:30080
 ```
+
+**注意**: 当 `ingress.enabled: false` 时，Chart 会自动将主服务从 ClusterIP 转换为 NodePort 类型，确保可以从集群外部访问。
 
 ## ⚙️ 配置说明
 
@@ -95,6 +119,17 @@ newapi:
     enabled: true
     replicaCount: 3
 
+# 服务配置 - 智能负载均衡
+service:
+  type: ClusterIP        # 当 ingress.enabled: false 时自动转换为 NodePort
+  port: 80
+  targetPort: 3000
+  nodePort: 30080        # 自动 NodePort 时使用的端口
+
+# Ingress 配置
+ingress:
+  enabled: false         # 设为 false 时自动启用 NodePort 外部访问
+
 # 启用自动扩缩容
 autoscaling:
   enabled: true
@@ -102,6 +137,11 @@ autoscaling:
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
 ```
+
+**智能负载均衡说明**:
+- 主服务 (`new-api`) 会根据启用的组件智能选择后端
+- 当 master 和 slave 都启用时，主服务优先选择 slave 进行负载均衡
+- 专用服务 (`new-api-master`, `new-api-slave`) 提供直接访问特定组件的能力
 
 ### 外部数据库配置
 
@@ -125,6 +165,51 @@ redis:
     password: "your-redis-password"
     database: 0
 ```
+
+### 服务配置
+
+```yaml
+# 服务类型和负载均衡配置
+service:
+  type: ClusterIP          # 服务类型: ClusterIP, NodePort, LoadBalancer
+  port: 80                 # 服务端口
+  targetPort: 3000         # 目标端口
+  nodePort: 30080          # NodePort端口 (当自动启用NodePort时使用)
+  
+  # 负载均衡器配置 (当type为LoadBalancer时)
+  loadBalancer:
+    enabled: false
+    annotations: {}
+
+# Ingress配置
+ingress:
+  enabled: false           # 是否启用Ingress
+  className: ""
+  hosts:
+    - host: new-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+#### 智能负载均衡特性
+
+Chart 提供智能负载均衡功能：
+
+1. **智能服务选择器**：
+   - 当只启用 slave 时，主服务自动选择 slave 组件
+   - 当只启用 master 时，主服务自动选择 master 组件
+   - 当两者都启用时，主服务优先选择 slave 组件进行负载均衡
+
+2. **自动 NodePort 启用**：
+   - 当 `ingress.enabled: false` 且 `service.type: ClusterIP` 时
+   - 主服务自动转换为 NodePort 类型，提供外部访问能力
+   - 默认使用端口 30080，可通过 `service.nodePort` 自定义
+
+3. **多层服务架构**：
+   - `new-api`: 主服务，提供智能负载均衡和外部访问
+   - `new-api-master`: 专用 master 服务，用于内部直接访问
+   - `new-api-slave`: 专用 slave 服务，用于内部直接访问
 
 ## 🔧 高级配置
 

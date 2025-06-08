@@ -222,8 +222,8 @@ Redis image name
 Storage class
 */}}
 {{- define "new-api.storageClass" -}}
-{{- if .Values.global.storageClass }}
-{{- .Values.global.storageClass }}
+{{- if .global.storageClass }}
+{{- .global.storageClass }}
 {{- else }}
 {{- .storageClass }}
 {{- end }}

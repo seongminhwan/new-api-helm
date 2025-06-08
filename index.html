@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New-API Helm Chart Repository</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #3498db;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin: 2px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            overflow-x: auto;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feature-list li:before {
+            content: "✓";
+            color: #27ae60;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 New-API Helm Chart Repository</h1>
+        
+        <p>这是 New-API 的官方 Helm Chart 仓库，提供高可用的 OpenAI API 网关服务部署解决方案。</p>
+        
+        <div class="badges">
+            <span class="badge">Kubernetes</span>
+            <span class="badge">Helm Chart</span>
+            <span class="badge">High Availability</span>
+            <span class="badge">Load Balancer</span>
+            <span class="badge">Auto Scaling</span>
+        </div>
+
+        <h2>📦 安装方式</h2>
+        <div class="code-block">
+# 添加 Helm 仓库
+helm repo add new-api https://&lt;your-username&gt;.github.io/&lt;repository-name&gt;
+
+# 更新仓库
+helm repo update
+
+# 安装 Chart
+helm install my-new-api new-api/new-api
+        </div>
+
+        <h2>🎯 主要特性</h2>
+        <ul class="feature-list">
+            <li>智能负载均衡 - 根据启用组件自动配置后端选择</li>
+            <li>自动外部访问 - Ingress未启用时自动转换为NodePort服务</li>
+            <li>高可用架构 - 支持Master-Slave部署模式</li>
+            <li>自动扩缩容 - 集成HPA水平Pod自动扩缩容</li>
+            <li>数据库支持 - 内置MySQL和Redis高可用配置</li>
+            <li>配置灵活 - 丰富的values.yaml配置选项</li>
+        </ul>
+
+        <h2>🔧 快速配置</h2>
+        <div class="code-block">
+# 基础部署
+helm install new-api new-api/new-api
+
+# 高可用部署
+helm install new-api new-api/new-api \
+  --set app.master.enabled=true \
+  --set app.slave.enabled=true \
+  --set app.slave.replicaCount=3 \
+  --set autoscaling.enabled=true
+
+# 自定义NodePort
+helm install new-api new-api/new-api \
+  --set service.nodePort=30080 \
+  --set ingress.enabled=false
+        </div>
+
+        <h2>📚 文档链接</h2>
+        <ul>
+            <li><a href="https://github.com/Calcium-Ion/new-api" target="_blank">New-API 项目主页</a></li>
+            <li><a href="#" onclick="window.open('https://github.com/' + window.location.hostname.split('.')[0] + '/' + window.location.pathname.split('/')[1], '_blank')" target="_blank">Helm Chart 源码</a></li>
+            <li><a href="#" onclick="window.open('https://github.com/' + window.location.hostname.split('.')[0] + '/' + window.location.pathname.split('/')[1] + '/blob/main/README.md', '_blank')" target="_blank">详细文档</a></li>
+        </ul>
+
+        <h2>📊 Chart 信息</h2>
+        <div class="code-block">
+Chart Version: 0.1.3
+App Version: latest
+Kubernetes: >=1.19.0
+Helm: >=3.0.0
+        </div>
+
+        <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
+            <p>© 2024 New-API Team. 使用 Helm 部署，托管在 GitHub Pages。</p>
+        </footer>
+    </div>
+</body>
+</html>
