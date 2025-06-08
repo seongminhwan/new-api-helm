@@ -1,0 +1,13 @@
+{{- if and .Values.mysql.enabled .Values.mysql.initdbScripts }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "new-api.fullname" . }}-mysql-init
+  labels:
+    {{- include "new-api.mysql.labels" . | nindent 4 }}
+data:
+{{- range $key, $value := .Values.mysql.initdbScripts }}
+  {{ $key }}: |
+{{ $value | indent 4 }}
+{{- end }}
+{{- end }}

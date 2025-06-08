@@ -89,6 +89,9 @@ service:
   targetPort: 3000
   annotations: {}
   
+  # NodePort settings (when type is NodePort or auto-enabled)
+  nodePort: 30080
+  
   # Load balancer settings (when type is LoadBalancer)
   loadBalancer:
     enabled: false
@@ -131,16 +134,25 @@ mysql:
   # Image settings
   image:
     registry: docker.io
-    repository: mysql
+    repository: bitnami/mysql
     tag: "8.0"
     pullPolicy: IfNotPresent
   
   # Database configuration
   auth:
-    rootPassword: ""  # Will be auto-generated if empty
+    rootPassword: "rootpassword"  # Fixed password for consistency
     database: "new-api"
     username: "newapi"
-    password: ""  # Will be auto-generated if empty
+    password: "newapi123"  # Fixed password matching application config
+  
+  # Initialization scripts (Bitnami MySQL way)
+  initdbScripts:
+    01-init-database.sql: |
+      -- Create database if not exists (though Bitnami MySQL auto-creates from auth.database)
+      CREATE DATABASE IF NOT EXISTS `new-api`;
+      
+      -- Note: Bitnami MySQL automatically creates the user from auth settings
+      -- No GRANT statements needed as Bitnami handles user creation and permissions
   
   # Resources
   resources:
@@ -198,7 +210,7 @@ redis:
   # Authentication
   auth:
     enabled: true
-    password: ""  # Will be auto-generated if empty
+    password: "redis123"  # Fixed password for consistency
   
   # Resources
   resources:

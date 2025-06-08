@@ -1,3 +1,4 @@
+{{/* Main service - intelligent load balancing between master and slave */}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,14 +10,29 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  {{- if and (not .Values.ingress.enabled) (eq .Values.service.type "ClusterIP") }}
+  type: NodePort
+  {{- else }}
   type: {{ .Values.service.type }}
+  {{- end }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: http
+      {{- if and (not .Values.ingress.enabled) (eq .Values.service.type "ClusterIP") }}
+      nodePort: {{ .Values.service.nodePort | default 30080 }}
+      {{- end }}
   selector:
     {{- include "new-api.selectorLabels" . | nindent 4 }}
+    {{- if and .Values.newapi.slave.enabled (not .Values.newapi.master.enabled) }}
+    app.kubernetes.io/component: slave
+    {{- else if and .Values.newapi.master.enabled (not .Values.newapi.slave.enabled) }}
+    app.kubernetes.io/component: master
+    {{- else if and .Values.newapi.master.enabled .Values.newapi.slave.enabled }}
+    {{/* When both are enabled, prefer slave for load balancing */}}
+    app.kubernetes.io/component: slave
+    {{- end }}
   {{- if .Values.service.loadBalancer.enabled }}
   {{- with .Values.service.loadBalancer.annotations }}
   annotations:
