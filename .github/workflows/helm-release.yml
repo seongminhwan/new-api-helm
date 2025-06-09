@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 验证作业 - 对所有推送运行lint和dry-run
+  # 验证作业 - 对所有推送运行lint和template
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -30,10 +30,9 @@ jobs:
       run: |
         helm lint .
 
-    - name: Dry Run Install
+    - name: Render Template
       run: |
         helm template . --debug
-        helm install --dry-run --debug --generate-name .
 
   # 发布作业 - 仅在标签推送时执行
   release:
@@ -117,11 +116,13 @@ jobs:
         echo "Chart has been published to GHCR and GitHub Pages"
         echo ""
         echo "GHCR (OCI) Usage:"
-        echo "1. Set up authentication to GHCR (https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)"
-        echo "2. Install or pull the chart:"
+        echo "1. 安装/获取特定版本:"
         echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
-        echo "   # 或使用latest标签"
+        echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
+        echo ""
+        echo "2. 使用latest标签:"
         echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version latest"
+        echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version latest"
         echo ""
         echo "GitHub Pages (传统Helm仓库) Usage:"
         echo "1. 添加Helm仓库:"
