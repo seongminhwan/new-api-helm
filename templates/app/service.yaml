@@ -30,8 +30,7 @@ spec:
     {{- else if and .Values.newapi.master.enabled (not .Values.newapi.slave.enabled) }}
     app.kubernetes.io/component: master
     {{- else if and .Values.newapi.master.enabled .Values.newapi.slave.enabled }}
-    {{/* When both are enabled, prefer slave for load balancing */}}
-    app.kubernetes.io/component: slave
+    {{/* When both are enabled, include both master and slave for load balancing */}}
     {{- end }}
   {{- if .Values.service.loadBalancer.enabled }}
   {{- with .Values.service.loadBalancer.annotations }}
