@@ -83,14 +83,14 @@ jobs:
     # 1. 发布到GitHub Pages (兼容传统Helm仓库)
     - name: Setup Helm Repository
       run: |
-        # 创建临时目录用于Helm仓库
-        mkdir -p helm-repo
+        # 创建临时目录用于Helm仓库，包括docs子目录
+        mkdir -p helm-repo/docs
         
         # 确保创建.nojekyll文件以完全禁用Jekyll
         touch helm-repo/.nojekyll
         
-        # 复制打包好的chart到Helm仓库目录
-        cp ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz helm-repo/
+        # 复制打包好的chart到Helm仓库的docs目录
+        cp ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz helm-repo/docs/
         
         # 如果存在旧的index.yaml，下载它
         git config --global user.name "GitHub Actions"
@@ -98,13 +98,13 @@ jobs:
         
         if git ls-remote --heads origin gh-pages; then
           git clone --branch gh-pages --single-branch --depth 1 https://x-access-token:${{ github.token }}@github.com/${{ github.repository }} gh-pages-branch
-          if [ -f gh-pages-branch/index.yaml ]; then
-            cp gh-pages-branch/index.yaml helm-repo/
+          if [ -f gh-pages-branch/docs/index.yaml ]; then
+            cp gh-pages-branch/docs/index.yaml helm-repo/docs/
           fi
         fi
         
         # 创建或更新index.yaml
-        cd helm-repo
+        cd helm-repo/docs
         if [ ! -f index.yaml ]; then
           helm repo index . --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         else
