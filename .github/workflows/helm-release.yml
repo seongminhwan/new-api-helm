@@ -1,8 +1,10 @@
-name: Release Helm Chart to GHCR
+name: Helm Chart CI/CD
 
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
     paths:
       - 'Chart.yaml'
       - 'values.yaml'
@@ -10,11 +12,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  # 验证作业 - 对所有推送运行lint和dry-run
+  validate:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -30,6 +30,31 @@ jobs:
       run: |
         helm lint .
 
+    - name: Dry Run Install
+      run: |
+        helm template . --debug
+        helm install --dry-run --debug --generate-name .
+
+  # 发布作业 - 仅在标签推送时执行
+  release:
+    runs-on: ubuntu-latest
+    # 仅在标签推送时运行此作业
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    permissions:
+      contents: write  # 用于发布到GitHub Pages
+      packages: write  # 用于发布到GHCR
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: '3.12.1'
+
     - name: Get Chart Info
       id: chart
       run: |
@@ -38,6 +63,34 @@ jobs:
         echo "name=$CHART_NAME" >> $GITHUB_OUTPUT
         echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
 
+    - name: Package Helm Chart
+      run: |
+        helm package .
+
+    # 1. 发布到GitHub Pages (兼容传统Helm仓库)
+    - name: Setup GitHub Pages
+      run: |
+        # 确保docs目录存在
+        mkdir -p docs
+        
+        # 如果不存在index.yaml，则创建一个
+        if [ ! -f docs/index.yaml ]; then
+          helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        fi
+        
+        # 移动打包好的chart到docs目录
+        mv ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz docs/
+        
+        # 更新index.yaml
+        helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }} --merge docs/index.yaml
+
+    - name: Deploy to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: docs
+        branch: gh-pages
+        
+    # 2. 发布到GHCR (OCI格式)
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
@@ -48,15 +101,30 @@ jobs:
     - name: Push Helm Chart to GHCR
       run: |
         echo "Publishing Helm chart ${{ steps.chart.outputs.name }}:${{ steps.chart.outputs.version }} to GHCR"
-        # 以OCI格式打包并推送
-        helm package .
+        
+        # 推送版本标签
         helm push ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/helm-charts
+        
+        # 额外推送latest标签
+        echo "Tagging and pushing as latest"
+        CHART_FILENAME="${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz"
+        LATEST_FILENAME="${{ steps.chart.outputs.name }}-latest.tgz"
+        cp "$CHART_FILENAME" "$LATEST_FILENAME"
+        helm push "$LATEST_FILENAME" oci://ghcr.io/${{ github.repository_owner }}/helm-charts
 
     - name: Output Repository Info
       run: |
-        echo "Chart has been published to GHCR"
-        echo "Usage information:"
+        echo "Chart has been published to GHCR and GitHub Pages"
+        echo ""
+        echo "GHCR (OCI) Usage:"
         echo "1. Set up authentication to GHCR (https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)"
         echo "2. Install or pull the chart:"
         echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
-        echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
+        echo "   # 或使用latest标签"
+        echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version latest"
+        echo ""
+        echo "GitHub Pages (传统Helm仓库) Usage:"
+        echo "1. 添加Helm仓库:"
+        echo "   helm repo add ${{ steps.chart.outputs.name }} https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        echo "2. 安装chart:"
+        echo "   helm install my-release ${{ steps.chart.outputs.name }}/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
