@@ -1,0 +1,28 @@
+# 测试Ingress配置
+# 用法: helm install new-api-ingress-test . -f examples/ingress-test.yaml
+
+# 启用Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: new-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: new-api-tls
+      hosts:
+        - new-api.example.com
+
+# 确保master和slave都启用
+newapi:
+  master:
+    enabled: true
+    replicaCount: 1
+  slave:
+    enabled: true
+    replicaCount: 2
