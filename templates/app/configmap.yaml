@@ -6,7 +6,12 @@ metadata:
     {{- include "new-api.labels" . | nindent 4 }}
 data:
   TZ: {{ .Values.config.timezone | quote }}
+  {{- if and .Values.ingress.enabled (gt (len .Values.ingress.hosts) 0) }}
+  {{- $host := index .Values.ingress.hosts 0 }}
+  FRONTEND_BASE_URL: {{ printf "https://%s" $host.host | quote }}
+  {{- else }}
   FRONTEND_BASE_URL: {{ .Values.config.frontendBaseUrl | quote }}
+  {{- end }}
   SYNC_FREQUENCY: {{ .Values.config.syncFrequency | quote }}
   BATCH_UPDATE_ENABLED: {{ .Values.config.batchUpdate.enabled | quote }}
   BATCH_UPDATE_INTERVAL: {{ .Values.config.batchUpdate.interval | quote }}
