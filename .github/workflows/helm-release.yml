@@ -61,10 +61,24 @@ jobs:
         CHART_VERSION=$(yq '.version' Chart.yaml)
         echo "name=$CHART_NAME" >> $GITHUB_OUTPUT
         echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
+        
+        # 打印调试信息
+        echo "Chart名称: $CHART_NAME"
+        echo "Chart版本: $CHART_VERSION"
 
     - name: Package Helm Chart
       run: |
         helm package .
+        
+        # 检查文件是否存在
+        PACKAGE_NAME="${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz"
+        if [ -f "$PACKAGE_NAME" ]; then
+          echo "Helm包已成功创建: $PACKAGE_NAME"
+          ls -la
+        else
+          echo "错误: Helm包创建失败!"
+          exit 1
+        fi
 
     # 1. 发布到GitHub Pages (兼容传统Helm仓库)
     - name: Setup GitHub Pages
@@ -72,16 +86,23 @@ jobs:
         # 确保docs目录存在
         mkdir -p docs
         
+        # 创建.nojekyll文件以禁用Jekyll处理
+        touch docs/.nojekyll
+        
         # 如果不存在index.yaml，则创建一个
         if [ ! -f docs/index.yaml ]; then
           helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         fi
         
         # 移动打包好的chart到docs目录
-        mv ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz docs/
+        cp ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz docs/
         
         # 更新index.yaml
         helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }} --merge docs/index.yaml
+        
+        # 检查文件
+        echo "docs目录内容:"
+        ls -la docs/
 
     - name: Deploy to GitHub Pages
       uses: JamesIves/github-pages-deploy-action@v4
@@ -101,21 +122,36 @@ jobs:
       run: |
         echo "Publishing Helm chart ${{ steps.chart.outputs.name }}:${{ steps.chart.outputs.version }} to GHCR"
         
+        # 检查文件是否存在
+        PACKAGE_NAME="${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz"
+        if [ ! -f "$PACKAGE_NAME" ]; then
+          echo "错误: 找不到Helm包 $PACKAGE_NAME!"
+          ls -la
+          exit 1
+        fi
+        
         # 推送版本标签
-        helm push ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/helm-charts
+        helm push "$PACKAGE_NAME" oci://ghcr.io/${{ github.repository_owner }}/helm-charts
         
         # 额外推送latest标签
         echo "Tagging and pushing as latest"
-        CHART_FILENAME="${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz"
         LATEST_FILENAME="${{ steps.chart.outputs.name }}-latest.tgz"
-        cp "$CHART_FILENAME" "$LATEST_FILENAME"
+        cp "$PACKAGE_NAME" "$LATEST_FILENAME"
+        
+        # 检查latest文件是否存在
+        if [ ! -f "$LATEST_FILENAME" ]; then
+          echo "错误: 创建latest标签文件失败!"
+          ls -la
+          exit 1
+        fi
+        
         helm push "$LATEST_FILENAME" oci://ghcr.io/${{ github.repository_owner }}/helm-charts
 
     - name: Output Repository Info
       run: |
-        echo "Chart has been published to GHCR and GitHub Pages"
+        echo "Chart已发布到GHCR和GitHub Pages"
         echo ""
-        echo "GHCR (OCI) Usage:"
+        echo "GHCR (OCI) 使用方法:"
         echo "1. 安装/获取特定版本:"
         echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
         echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version ${{ steps.chart.outputs.version }}"
@@ -124,7 +160,7 @@ jobs:
         echo "   helm install my-release oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version latest"
         echo "   helm pull oci://ghcr.io/${{ github.repository_owner }}/helm-charts/${{ steps.chart.outputs.name }} --version latest"
         echo ""
-        echo "GitHub Pages (传统Helm仓库) Usage:"
+        echo "GitHub Pages (传统Helm仓库) 使用方法:"
         echo "1. 添加Helm仓库:"
         echo "   helm repo add ${{ steps.chart.outputs.name }} https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
         echo "2. 安装chart:"
