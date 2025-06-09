@@ -8,7 +8,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: 16k
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   name: routerhub
-  namespace: routerhub
+  namespace: new-api
   labels:
     app.kubernetes.io/name: routerhub
     app.kubernetes.io/instance: routerhub
@@ -20,7 +20,7 @@ spec:
       paths:
       - backend:
           service:
-            name: routerhub
+            name: new-api
             port:
               number: 80
         path: /
@@ -28,4 +28,4 @@ spec:
   tls:
   - hosts:
     - ai.routerhub.io
-    secretName: routerhub-tls
+    secretName: new-api-tls
