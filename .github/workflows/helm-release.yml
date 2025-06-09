@@ -81,34 +81,48 @@ jobs:
         fi
 
     # 1. 发布到GitHub Pages (兼容传统Helm仓库)
-    - name: Setup GitHub Pages
+    - name: Setup Helm Repository
       run: |
-        # 确保docs目录存在
-        mkdir -p docs
+        # 创建临时目录用于Helm仓库
+        mkdir -p helm-repo
         
-        # 创建.nojekyll文件以禁用Jekyll处理
-        touch docs/.nojekyll
+        # 确保创建.nojekyll文件以完全禁用Jekyll
+        touch helm-repo/.nojekyll
         
-        # 如果不存在index.yaml，则创建一个
-        if [ ! -f docs/index.yaml ]; then
-          helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        # 复制打包好的chart到Helm仓库目录
+        cp ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz helm-repo/
+        
+        # 如果存在旧的index.yaml，下载它
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+        if git ls-remote --heads origin gh-pages; then
+          git clone --branch gh-pages --single-branch --depth 1 https://x-access-token:${{ github.token }}@github.com/${{ github.repository }} gh-pages-branch
+          if [ -f gh-pages-branch/index.yaml ]; then
+            cp gh-pages-branch/index.yaml helm-repo/
+          fi
         fi
         
-        # 移动打包好的chart到docs目录
-        cp ${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz docs/
+        # 创建或更新index.yaml
+        cd helm-repo
+        if [ ! -f index.yaml ]; then
+          helm repo index . --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        else
+          helm repo index . --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }} --merge index.yaml
+        fi
         
-        # 更新index.yaml
-        helm repo index docs/ --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }} --merge docs/index.yaml
-        
-        # 检查文件
-        echo "docs目录内容:"
-        ls -la docs/
+        # 显示仓库内容以便调试
+        echo "Helm仓库内容:"
+        ls -la
 
+    # 使用简单的git命令直接提交到gh-pages分支
     - name: Deploy to GitHub Pages
-      uses: JamesIves/github-pages-deploy-action@v4
-      with:
-        folder: docs
-        branch: gh-pages
+      run: |
+        cd helm-repo
+        git init
+        git add .
+        git commit -m "更新Helm仓库 - ${{ steps.chart.outputs.name }}:${{ steps.chart.outputs.version }}"
+        git push -f https://x-access-token:${{ github.token }}@github.com/${{ github.repository }} HEAD:gh-pages
         
     # 2. 发布到GHCR (OCI格式)
     - name: Login to GitHub Container Registry
